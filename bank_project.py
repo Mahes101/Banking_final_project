@@ -4,8 +4,12 @@ import streamlit as st
 from streamlit_option_menu import option_menu 
 import seaborn as sns 
 import matplotlib.pyplot as plt
+from joblib import load
 
 from wordcloud import STOPWORDS, WordCloud
+
+from sklearn.preprocessing import LabelEncoder
+from sklearn import preprocessing
 
 import re
 import warnings as wr
@@ -16,7 +20,7 @@ wr.filterwarnings('ignore')
 import sweetviz as sv
 import codecs
 
-
+from sklearn.preprocessing import StandardScaler
 import streamlit.components.v1 as components
 from streamlit_pandas_profiling import st_profile_report
 
@@ -32,7 +36,7 @@ st.set_page_config(page_title='BANKING PROJECT',page_icon=icon,layout="wide")
 
 html_temp = """
         <div style="background-color:#08457e;padding:10px;border-radius:10px">
-        <h1 style="color:white;text-align:center;">BANKING ML MODEL TRAINING AND PREDICTION</h1>
+        <h1 style="color:white;text-align:center;">COMPREHENSIVE BANKING ANALYSIS AND PREDICTION</h1>
         </div>"""
 
 # components.html("<p style='color:red;'> Streamlit Components is Awesome</p>")
@@ -42,8 +46,8 @@ style1 = "<style>h3 {text-align: left;}</style>"
 
 
 selected = option_menu(None,
-                       options = ["Home","Data View and EDA","ML Prediction","Insights"],
-                       icons = ["house-door-fill","bar-chart-line-fill","bi-binoculars-fill","bi-binoculars-fill"],
+                       options = ["Home","Data View and EDA","ML Prediction"],
+                       icons = ["house-door-fill","bar-chart-line-fill","bi-binoculars-fill"],
                        default_index=0,
                        orientation="horizontal",
                        styles={"container": {"width": "100%"},
@@ -63,7 +67,7 @@ def home_menu():
                 
                 
         with col2:
-                st.title(':blue[BANKING ANALYSIS]')  
+                st.title(':blue[COMPREHENSIVE BANKING ANALYSIS]')  
                 st.header('[BANKING]')  
                 st.markdown(style, unsafe_allow_html=True)    
                 st.write("All financial institutions will need to examine each of their businesses to assess where their competitive advantages lie across and within the three core banking activities of balance sheet, transactions, and distribution. And they will need to do so in a world in which technology and AI will play a more prominent role, and against the backdrop of a shifting macroeconomic environment and heightened geopolitical risks.")
@@ -147,7 +151,7 @@ def bivariate_analysis():
         if option1 == "Categorical columns":
                 st.title("")
                 plt.figure(figsize=(16, 8))
-                sns.scatterplot(data=df, y="Month", x="Num_of_Loan")
+                sns.violinplot(data=df, y="Month", x="Num_of_Loan")
                 plt.title('MONTH VS NUM_OF_LOAN')
                 st.pyplot()
                 
@@ -161,8 +165,13 @@ def bivariate_analysis():
                 st.pyplot()
                 
                 plt.figure(figsize=(16, 8))
-                sns.violinplot(data=df, y="Payment_Behaviour", x="Occupation")
-                plt.title('Occupation vs Payment_Behaviour')
+                sns.violinplot(data=df, x="Month", y="Total_EMI_per_month")
+                plt.title('Month vs Total_EMI_per_month')
+                st.pyplot()
+                
+                plt.figure(figsize=(16, 8))
+                sns.barplot(data=df, x="Month", y="Amount_invested_monthly")
+                plt.title('Month vs Amount_invested_monthly')
                 st.pyplot()
         if option1 == "Numerical columns": 
                 #Plotting a pair plot for bivariate analysis
@@ -347,8 +356,170 @@ def Clustered_Model():
                 st.subheader("Number of Rows and Columns in Cluster3") 
                 st.markdown(style, unsafe_allow_html=True)
                 st.write(df_clus3.shape)
+
+def labeling(late_payment):
+        '''
+        we have late payments in range between 0 to 25, we will lable with below categorized value
+        1. low risk: 0 to 2
+        2. medium risk: 3 to 10
+        3. high risk: 11 to 25
+        
+        '''
+        if late_payment<=2:
+            return 'low_risk'
+        elif 3 <= late_payment <=10 :
+            return 'medium_risk'
+        else:
+            return 'high_risk'
+        
+def loan(x,y):
+        if ( x in ['Standard','Good'] ) and (y in ['low_risk','medium_risk']):
+            return 'Approved'
+        else:
+            return 'Rejected'                 
+         
+                  
+def classification_model():
+        #Month_options = [1,2,3,4,5,6,7,8]
+        occupation_options = ['Scientist', 'Teacher', 'Engineer', 'Entrepreneur', 'Developer',
+                                'Lawyer', 'Media_Manager', 'Doctor', 'Journalist', 'Manager',
+                                'Accountant', 'Musician', 'Mechanic', 'Writer', 'Architect']
+        Num_bank_accounts = [1,2,3,4,5,6,7,8,9,10,11]
+        intrest_rate = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34]
+        num_of_loans = [0,1,2,3,4,5,6,7,8,9]
+        num_of_delayed_payment = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]
+        num_credit_enquires = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
+        credit_mix = ['Good','Bad','Standard']
+        payment_min_amount = ['Yes','No','NM']
+        payment_behaviour = ['High_spent_Small_value_payments','Low_spent_Large_value_payments','Low_spent_Medium_value_payments',
+                                'Low_spent_Small_value_payments','High_spent_Medium_value_payments','High_spent_Large_value_payments']
+        age = [23, 28, 34, 54, 55, 21, 31, 33, 30, 24, 44, 45, 40, 41, 32, 35, 36,
+                39, 37, 20, 46, 26, 42, 19, 48, 38, 43, 22, 16, 18, 15, 27, 25, 14,
+                17, 47, 53, 56, 29, 49, 51, 50, 52]
+        #type_of_loan = df['Type_of_Loan'].unique().tolist()
+        #type_of_loan = ['Auto Loan', 'Credit-Builder Loan', 'Personal Loan', 'Home Equity Loan','Not Specified','Payday Loan','Student Loan','Mortgage Loan']
+        # Define the widgets for user input
+        with st.form("my_form"):
+                col1, col2, col3 = st.columns([5, 2, 5])
+                with col1:
+                        st.write(' ')
+                        Age = st.selectbox("Age", sorted(age), key=1)
+                        Occupation = st.selectbox("Occupation", occupation_options, key=2)                      
+                        Num_bank_acc = st.selectbox("Number of bank Accounts",Num_bank_accounts, key=3)
+                        Num_credit_card = st.selectbox("Number of Credit Card", Num_bank_accounts, key=4)
+                        Intrest_rate = st.selectbox("Interest Rate", intrest_rate, key=5)
+                        Num_of_loans = st.selectbox("Number of loans", num_of_loans, key=6)
+                        Num_of_Delayed_Payment = st.selectbox("Number of Delayed Payments", num_of_delayed_payment, key=7)
+                        Num_Credit_Inquiries = st.selectbox("Number of Credit Enquiries", num_credit_enquires, key=8)
+                        Credit_mix = st.selectbox("Credit Mix", credit_mix, key=9)
+                        Payment_of_Min_Amount = st.selectbox("Payment of Minimum Amount", payment_min_amount, key=10)                       
+                        Payment_Behaviour = st.selectbox("Payment Behaviour", payment_behaviour, key=11)
                         
-    
+                        
+                with col3:
+                        st.write(f'<h5 style="color:rgb(0, 153, 153,0.4);">NOTE: Min & Max given for reference, you can enter any value</h5>',
+                                unsafe_allow_html=True)
+                        Name = st.text_input("Enter Name")
+                        Annual_Income = st.text_input("Enter Annual_Income (Min:7005.93 & Max:179987.28)")
+                        Monthly_Inhand_Salary = st.text_input("Enter Monthly_Inhand_Salary (Min:303.6454167 & Max:15204.63333)")
+                        Delay_from_due_date = st.text_input("Delay_from_due_date (Min:0, Max:62)")
+                        Changed_Credit_Limit = st.text_input("Changed_Credit_Limit (Min:0.5, Max:29.98)")
+                        Outstanding_Debt = st.text_input("Outstanding_Debt (Min:0.23, Max:4998.07)")
+                        Credit_Utilization_Ratio = st.text_input("Credit_Utilization_Ratio (Min:20.0, Max:50.0)")
+                        Credit_History_Age = st.text_input("Credit_History_Age (Min:1, Max:404)")
+                        Total_EMI_per_month = st.text_input("Total_EMI_per_month (Min:0.0, Max:1779.103254)")
+                        Amount_invested_monthly = st.text_input("Amount_invested_monthly (Min:0.0, Max:434.1910894)")
+                        Monthly_Balance = st.text_input("Monthly_Balance (Min:0.007759665, Max:1183.930696)")
+                        submit_button = st.form_submit_button(label="PREDICT AVAILABILITY OF NEW CREDIT")
+                        st.markdown("""
+                                <style>
+                                div.stButton > button:first-child {
+                                        background-color: #009999;
+                                        color: white;
+                                        width: 100%;
+                                }
+                                </style>
+                                """, unsafe_allow_html=True)
+
+                        flag = 0
+                        pattern = "^(?:\d+|\d*\.\d+)$"
+                        for i in [Annual_Income,Monthly_Inhand_Salary,Delay_from_due_date,Changed_Credit_Limit,Outstanding_Debt,Credit_Utilization_Ratio,Credit_History_Age,Total_EMI_per_month,Amount_invested_monthly,Monthly_Balance]:
+                                if re.match(pattern, i):
+                                        pass
+                                else:
+                                        flag = 1
+                                        break
+
+                if submit_button and flag == 1:
+                        if len(i) == 0:
+                                st.write("please enter a valid number space not allowed")
+                        else:
+                                st.write("You have entered an invalid value: ", i)
+                
+                #encoding the categorigal columns
+                #Credit_Mix_map = { 'Bad':0, 'Standard':1, 'Good': 2  }
+                if Credit_mix == 'Bad':
+                        Credit_mix = 0
+                elif Credit_mix == 'Standard':
+                        Credit_mix = 1
+                elif Credit_mix == 'Good':
+                        Credit_mix = 2
+                                
+                #Payment_of_Min_Amount_map = { 'No':0, 'NM':1, 'Yes':2 }
+                if Payment_of_Min_Amount == 'No':
+                        Payment_of_Min_Amount = 0
+                elif Payment_of_Min_Amount == 'NM':
+                        Payment_of_Min_Amount = 1
+                elif Payment_of_Min_Amount == 'Yes':
+                        Payment_of_Min_Amount = 2
+                #Payment_Behaviour_map = { 'Low_spent_Small_value_payments': 0 , 'Low_spent_Medium_value_payments':1, 'Low_spent_Large_value_payments':2,
+                                       # 'High_spent_Small_value_payments':3, 'High_spent_Medium_value_payments':4, 'High_spent_Large_value_payments':5
+                                        #}
+                
+                if Payment_Behaviour == 'Low_spent_Small_value_payments':
+                        Payment_Behaviour = 0
+                elif Payment_Behaviour == 'Low_spent_Medium_value_payments':
+                        Payment_Behaviour = 1
+                elif Payment_Behaviour == 'Low_spent_Large_value_payments':
+                        Payment_Behaviour = 2
+                elif Payment_Behaviour == 'High_spent_Small_value_payments':
+                        Payment_Behaviour = 3
+                elif Payment_Behaviour == 'High_spent_Medium_value_payments':
+                        Payment_Behaviour = 4
+                elif Payment_Behaviour == 'High_spent_Large_value_payments':
+                        Payment_Behaviour = 5
+                        
+                #Credit_mix = Credit_mix.map(Credit_Mix_map)
+                
+                #Payment_of_Min_Amount = Payment_of_Min_Amount.map(Payment_of_Min_Amount_map)
+                
+                #Payment_Behaviour = Payment_Behaviour.map(Payment_Behaviour_map)
+                
+                columns_data = [int(Age), int(Num_bank_acc), int(Num_credit_card), int(Num_of_loans), int(Delay_from_due_date), int(Num_of_Delayed_Payment),
+                                int(Num_Credit_Inquiries), Credit_mix, int(Credit_History_Age), Payment_of_Min_Amount, Payment_Behaviour,
+                                np.log10(float(Annual_Income)), np.log10(float(Monthly_Inhand_Salary)), np.log10(float(Intrest_rate)), np.log10(float(Changed_Credit_Limit)), np.log10(float(Outstanding_Debt)), 
+                                np.log10(float(Credit_Utilization_Ratio)),np.log10(float(Total_EMI_per_month)), np.log10(float(Amount_invested_monthly)), np.log10(float(Monthly_Balance))]  
+                #feature scaling
+                scaling_model = load('bank_scaler.joblib')
+                scaled_class = scaling_model.fit([columns_data]).transform([columns_data])
+                
+                #loading the trained model
+                model = load('bank_classification.joblib')
+                predicted = model.predict(scaled_class)  
+                #Risk Assesment
+                Risk_Assessment = labeling(Num_of_Delayed_Payment)
+
+                # mapping the loan status based on the predicted value
+                Loan_Status = loan(predicted,Risk_Assessment)
+                
+                if submit_button and flag == 0:
+                        predicted_data = "Loan Availability Status: " + Loan_Status
+                        st.success(predicted_data)
+                
+                        
+
+                                        
+        
 
 
 ####........ STREAMLIT CODING ........####    
@@ -406,11 +577,11 @@ if selected == "ML Prediction":
         <h3 style="color:white;text-align:center;">ML MODEL TRAINING AND PREDICTIONS</h3>
         </div>"""
         components.html(html_temp)   
-        choice1 = st.sidebar.selectbox("Choose an option",["Clustered Model","Classification Model","Regression Model"]) 
+        choice1 = st.sidebar.selectbox("Choose an option",["Clustered Model","Classification Model"]) 
         if choice1 == "Clustered Model":
                 Clustered_Model()
-                
-        else:
-                pass        
+        if choice1 == "Classification Model":
+                classification_model()        
+                       
                 
             
